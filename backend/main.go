@@ -56,6 +56,7 @@ var limiter = rate.NewLimiter(rate.Every(time.Second), 5) // 每秒5个请求
 
 var (
 	rsaService *crypto_service.RSAService
+	jwtService *crypto_service.JWTService
 )
 
 func rateLimitMiddleware() gin.HandlerFunc {
@@ -83,6 +84,9 @@ func init() {
 	if err != nil {
 		log.Fatalf("初始化RSA服务失败: %v", err)
 	}
+
+	// 初始化JWT服务
+	jwtService = crypto_service.NewJWTService(getEnv("JWT_SECRET", "your-secret-key"))
 }
 
 // 将短格式的RSA加密字符串转换回标准base64格式
@@ -169,6 +173,37 @@ func decryptAESData(encryptedData string, key []byte) (string, error) {
 	return result, nil
 }
 
+// authMiddleware JWT认证中间件
+func authMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authHeader := c.GetHeader("Authorization")
+		if authHeader == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "未提供认证token"})
+			c.Abort()
+			return
+		}
+
+		// 从Bearer token中提取token
+		tokenParts := strings.Split(authHeader, " ")
+		if len(tokenParts) != 2 || tokenParts[0] != "Bearer" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "无效的token格式"})
+			c.Abort()
+			return
+		}
+
+		claims, err := jwtService.ValidateToken(tokenParts[1])
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "无效的token"})
+			c.Abort()
+			return
+		}
+
+		// 将用户信息存储到上下文中
+		c.Set("username", claims.Username)
+		c.Next()
+	}
+}
+
 // 处理登录请求
 func handleLogin(c *gin.Context) {
 	// 获取RSA加密的AES密钥
@@ -217,9 +252,17 @@ func handleLogin(c *gin.Context) {
 
 	// 验证用户名和密码
 	if username == "admin" && password == "password" {
+		// 生成JWT token
+		token, err := jwtService.GenerateToken(username)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "生成token失败"})
+			return
+		}
+
 		c.JSON(http.StatusOK, gin.H{
 			"status":  "success",
 			"message": "登录成功",
+			"token":   token,
 		})
 	} else {
 		c.JSON(http.StatusUnauthorized, gin.H{
@@ -282,7 +325,7 @@ func main() {
 	r.Use(func(c *gin.Context) {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-Encrypted-Key")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-Encrypted-Key, Authorization")
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(204)
 			return
@@ -317,21 +360,26 @@ func main() {
 		// 登录接口
 		api.POST("/login", handleLogin)
 
-		// 加密接口
-		api.POST("/encrypt", handleEncrypt)
+		// 需要认证的接口
+		authorized := api.Group("/")
+		authorized.Use(authMiddleware())
+		{
+			// 加密接口
+			authorized.POST("/encrypt", handleEncrypt)
 
-		// 私钥获取接口
-		api.GET("/private-key", func(c *gin.Context) {
-			privateKey, err := rsaService.GetPrivateKeyPEM()
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "获取私钥失败"})
-				return
-			}
+			// 私钥获取接口
+			authorized.GET("/private-key", func(c *gin.Context) {
+				privateKey, err := rsaService.GetPrivateKeyPEM()
+				if err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "获取私钥失败"})
+					return
+				}
 
-			c.JSON(http.StatusOK, gin.H{
-				"private_key": privateKey,
+				c.JSON(http.StatusOK, gin.H{
+					"private_key": privateKey,
+				})
 			})
-		})
+		}
 	}
 
 	// 启动服务器

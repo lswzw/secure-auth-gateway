@@ -79,6 +79,12 @@ export default {
       error.value = ''
 
       try {
+        // 获取token
+        const token = sessionStorage.getItem('token')
+        if (!token) {
+          throw new Error('未登录或登录已过期')
+        }
+
         // 生成随机密钥
         const aesKey = generateRandomKey()
         console.log('生成的AES密钥:', aesKey)
@@ -97,13 +103,15 @@ export default {
         console.log('请求数据:', requestData)
         console.log('请求头:', {
           'Content-Type': 'application/json',
-          'X-Encrypted-Key': encryptedKey
+          'X-Encrypted-Key': encryptedKey,
+          'Authorization': `Bearer ${token}`
         })
 
         const response = await axios.post(`${import.meta.env.VITE_API_BASE_URL}/encrypt`, requestData, {
           headers: {
             'Content-Type': 'application/json',
-            'X-Encrypted-Key': encryptedKey
+            'X-Encrypted-Key': encryptedKey,
+            'Authorization': `Bearer ${token}`
           }
         })
 

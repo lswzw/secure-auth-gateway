@@ -173,6 +173,8 @@ export default {
 
         // 检查响应状态
         if (response.status === 200 && response.data.status === 'success') {
+          // 保存token到sessionStorage（浏览器关闭后失效）
+          sessionStorage.setItem('token', response.data.token)
           localStorage.setItem('isLoggedIn', 'true')
           isLoggedIn.value = true
         } else {
