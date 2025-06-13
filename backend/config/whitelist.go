@@ -68,7 +68,6 @@ func LoadWhitelist() {
 
 // IsWhitelisted 检查路径是否在白名单
 func IsWhitelisted(path string) bool {
-	LoadWhitelist()
 	isWhitelisted := whitelistMap[path]
 	log.Printf("检查路径 %s 是否在白名单中: %v", path, isWhitelisted)
 	return isWhitelisted

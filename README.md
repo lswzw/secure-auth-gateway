@@ -44,7 +44,11 @@ ModuGate = Modular + Gateway
 │
 ├── backend/                # 后端项目目录
 │   ├── crypto_service/     # 加密服务模块
+│   │   ├── rsa_service.go  # RSA加密服务实现
+│   │   └── jwt_service.go  # JWT认证服务实现
 │   ├── config/            # 配置文件目录
+│   │   ├── whitelist.go   # 白名单配置管理
+│   │   └── whitelist.yaml # 白名单配置文件
 │   ├── keys/              # 密钥存储目录
 │   ├── main.go            # 主程序入口
 │   ├── go.mod             # Go 模块配置
@@ -109,6 +113,23 @@ ModuGate = Modular + Gateway
 - CryptoJS
 - Node.js 18+
 
+#### 前端特性
+
+1. 请求重试机制
+   - 自动重试失败的请求
+   - 可配置的重试策略：
+     * 最大重试次数：3次
+     * 重试间隔：指数退避算法（1s, 2s, 4s）
+     * 仅对特定HTTP状态码进行重试（如网络错误、5xx错误）
+   - 支持请求取消和超时控制
+   - 重试过程中的状态提示
+   - 重试失败后的优雅降级处理
+
+2. 加密通信
+   - RSA公钥加密
+   - AES会话密钥管理
+   - 自动密钥更新
+
 ### 后端
 - Go 1.21+
 - Gin Web框架
@@ -134,6 +155,9 @@ ModuGate = Modular + Gateway
 
 3. 密钥管理
    - 自动密钥轮换
+     * 默认每10分钟自动轮换一次RSA密钥对
+     * 支持通过环境变量配置轮换周期
+     * 轮换过程自动记录日志
    - 安全的密钥存储
    - 密钥使用审计
 
@@ -169,6 +193,22 @@ http://localhost:80
 - Node.js 18+
 - Go 1.21+
 - Docker & Docker Compose
+
+### 环境变量配置
+
+项目支持通过环境变量进行配置，主要配置项如下：
+
+1. RSA密钥轮换配置
+```bash
+# 设置RSA密钥轮换周期（单位：分钟）
+RSA_KEY_ROTATION_PERIOD=30  # 设置为30分钟轮换一次
+```
+
+2. 日志配置
+```bash
+# 日志级别配置
+LOG_LEVEL=info  # 可选值：debug, info, warn, error
+```
 
 ### 开发环境设置
 

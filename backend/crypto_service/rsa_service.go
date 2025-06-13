@@ -6,10 +6,17 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
+	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"time"
+)
+
+const (
+	defaultRotationPeriod = 10 * time.Minute // 默认10分钟
+	envKeyRotationPeriod  = "RSA_KEY_ROTATION_PERIOD"
 )
 
 type RSAService struct {
@@ -19,11 +26,25 @@ type RSAService struct {
 	privateKeyLock sync.RWMutex
 }
 
+// getRotationPeriod 从环境变量获取轮换时间，如果未设置则返回默认值
+func getRotationPeriod() time.Duration {
+	if periodStr := os.Getenv(envKeyRotationPeriod); periodStr != "" {
+		if period, err := strconv.Atoi(periodStr); err == nil && period > 0 {
+			return time.Duration(period) * time.Minute
+		}
+	}
+	return defaultRotationPeriod
+}
+
 // NewRSAService 创建新的RSA服务实例
 func NewRSAService(keyPath string) (*RSAService, error) {
 	service := &RSAService{
 		keyPath: keyPath,
 	}
+
+	// 打印密钥轮换时间配置
+	rotationPeriod := getRotationPeriod()
+	log.Printf("RSA密钥轮换服务已启动，轮换周期设置为: %v", rotationPeriod)
 
 	// 尝试加载现有密钥
 	if err := service.loadKeys(); err != nil {
@@ -123,18 +144,20 @@ func (s *RSAService) generateKeyPair() error {
 
 // startKeyRotation 启动密钥轮换定时器
 func (s *RSAService) startKeyRotation() {
-	ticker := time.NewTicker(24 * time.Hour) // 每24小时更新一次
+	rotationPeriod := getRotationPeriod()
+	ticker := time.NewTicker(rotationPeriod)
 	defer ticker.Stop()
 
 	for range ticker.C {
 		if err := s.generateKeyPair(); err != nil {
-			// 记录错误但继续运行
+			log.Printf("生成新密钥对失败: %v", err)
 			continue
 		}
 		if err := s.saveKeys(); err != nil {
-			// 记录错误但继续运行
+			log.Printf("保存新密钥对失败: %v", err)
 			continue
 		}
+		log.Printf("密钥轮换成功完成，下次轮换将在 %v 后进行", rotationPeriod)
 	}
 }
 

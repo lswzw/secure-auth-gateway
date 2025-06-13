@@ -90,7 +90,6 @@ export default {
       
       // 转换为base64
       const base64Data = CryptoJS.enc.Base64.stringify(combined)
-      console.log('加密后的base64数据:', base64Data)
       return base64Data
     }
 
@@ -105,8 +104,6 @@ export default {
         }
         // 将base64字符串转换为更短的格式
         const shortKey = encrypted.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
-        console.log('RSA加密后的完整密钥:', encrypted)
-        console.log('转换后的短密钥:', shortKey)
         return shortKey
       } catch (error) {
         console.error('RSA加密过程出错:', error)
@@ -115,77 +112,96 @@ export default {
     }
 
     const getPublicKey = async () => {
-      try {
-        const response = await axios.get(`${API_BASE_URL}/public-key`)
-        publicKey.value = response.data.public_key
-        console.log('获取到的公钥:', publicKey.value)
-      } catch (err) {
-        error.value = '获取公钥失败'
-        console.error('获取公钥失败:', err)
+      const maxRetries = 3;
+      let retryCount = 0;
+      
+      while (retryCount < maxRetries) {
+        try {
+          const response = await axios.get(`${API_BASE_URL}/public-key`)
+          publicKey.value = response.data.public_key
+          return
+        } catch (err) {
+          retryCount++
+          if (retryCount === maxRetries) {
+            error.value = '获取公钥失败，请刷新页面重试'
+            console.error('获取公钥失败:', err)
+            return
+          }
+          await new Promise(resolve => setTimeout(resolve, 1000 * retryCount)) // 递增延迟
+        }
       }
     }
 
     const handleLogin = async () => {
       loading.value = true
       error.value = ''
+      const maxRetries = 3
+      let retryCount = 0
 
-      try {
-        // 先获取公钥
-        await getPublicKey()
-        
-        if (!publicKey.value) {
-          throw new Error('获取公钥失败')
-        }
-
-        // 保存公钥到localStorage
-        localStorage.setItem('publicKey', publicKey.value)
-        
-        // 生成随机密钥
-        const aesKey = generateRandomKey()
-        console.log('生成的AES密钥:', aesKey)
-        
-        // 使用 AES 加密数据
-        const encryptedUsername = encryptWithAES(username.value, aesKey)
-        const encryptedPassword = encryptWithAES(password.value, aesKey)
-        console.log('加密后的用户名:', encryptedUsername)
-        console.log('加密后的密码:', encryptedPassword)
-        
-        // 使用 RSA 加密 AES 密钥
-        const encryptedKey = encryptWithRSA(aesKey)
-        console.log('加密后的AES密钥:', encryptedKey)
-
-        const requestData = {
-          username: encryptedUsername,
-          password: encryptedPassword
-        }
-        console.log('请求数据:', requestData)
-        console.log('请求头:', {
-          'Content-Type': 'application/json',
-          'X-Encrypted-Key': encryptedKey
-        })
-
-        const response = await axios.post(`${API_BASE_URL}/login`, requestData, {
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Encrypted-Key': encryptedKey
+      while (retryCount < maxRetries) {
+        try {
+          // 每次重试前都重新获取公钥
+          await getPublicKey()
+          
+          if (!publicKey.value) {
+            throw new Error('获取公钥失败')
           }
-        })
 
-        // 检查响应状态
-        if (response.status === 200 && response.data.status === 'success') {
-          // 保存token到sessionStorage（浏览器关闭后失效）
-          sessionStorage.setItem('token', response.data.token)
-          localStorage.setItem('isLoggedIn', 'true')
-          isLoggedIn.value = true
-        } else {
-          throw new Error(response.data.error || '登录失败')
+          // 保存公钥到localStorage
+          localStorage.setItem('publicKey', publicKey.value)
+          
+          // 生成随机密钥
+          const aesKey = generateRandomKey()
+          
+          // 使用 AES 加密数据
+          const encryptedUsername = encryptWithAES(username.value, aesKey)
+          const encryptedPassword = encryptWithAES(password.value, aesKey)
+          
+          // 使用 RSA 加密 AES 密钥
+          const encryptedKey = encryptWithRSA(aesKey)
+
+          const requestData = {
+            username: encryptedUsername,
+            password: encryptedPassword
+          }
+
+          const response = await axios.post(`${API_BASE_URL}/login`, requestData, {
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Encrypted-Key': encryptedKey
+            }
+          })
+
+          // 检查响应状态
+          if (response.status === 200 && response.data.status === 'success') {
+            // 保存token到sessionStorage（浏览器关闭后失效）
+            sessionStorage.setItem('token', response.data.token)
+            localStorage.setItem('isLoggedIn', 'true')
+            isLoggedIn.value = true
+            break // 成功则退出重试循环
+          } else {
+            throw new Error(response.data.error || '登录失败')
+          }
+        } catch (err) {
+          retryCount++
+          if (retryCount === maxRetries) {
+            error.value = err.message || '登录失败，请重试'
+            console.error('登录错误:', err)
+            break
+          }
+          
+          // 如果是400错误，可能是密钥问题，强制更新公钥
+          if (err.response && err.response.status === 400) {
+            // 清除本地存储的公钥
+            localStorage.removeItem('publicKey')
+            // 重新获取公钥
+            await getPublicKey()
+          }
+          
+          await new Promise(resolve => setTimeout(resolve, 1000 * retryCount)) // 递增延迟
         }
-      } catch (err) {
-        error.value = err.message || '登录失败，请重试'
-        console.error('登录错误:', err)
-      } finally {
-        loading.value = false
       }
+      loading.value = false
     }
 
     return {

@@ -88,6 +88,9 @@ func init() {
 
 	// 初始化JWT服务
 	jwtService = crypto_service.NewJWTService(getEnv("JWT_SECRET", "your-secret-key"))
+
+	// 加载白名单配置
+	config.LoadWhitelist()
 }
 
 // 将短格式的RSA加密字符串转换回标准base64格式
@@ -107,15 +110,11 @@ func convertShortKeyToBase64(shortKey string) string {
 
 // AES解密函数
 func decryptAESData(encryptedData string, key []byte) (string, error) {
-	log.Printf("\n=== 开始AES解密过程 ===")
-	log.Printf("1. 收到的base64加密数据: %s", encryptedData)
-
 	// 解码base64
 	data, err := base64.StdEncoding.DecodeString(encryptedData)
 	if err != nil {
 		return "", fmt.Errorf("解码base64失败: %v", err)
 	}
-	log.Printf("2. base64解码后的数据: %x", data)
 
 	// 提取IV（前16字节）
 	if len(data) < aes.BlockSize {
@@ -123,32 +122,22 @@ func decryptAESData(encryptedData string, key []byte) (string, error) {
 	}
 	iv := data[:aes.BlockSize]
 	ciphertext := data[aes.BlockSize:]
-	log.Printf("3. 分离IV和密文:")
-	log.Printf("   - IV (前16字节): %x", iv)
-	log.Printf("   - 密文 (剩余字节): %x", ciphertext)
-	log.Printf("   - 使用的密钥: %x", key)
 
 	// 创建AES cipher
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return "", fmt.Errorf("创建AES cipher失败: %v", err)
 	}
-	log.Printf("4. 成功创建AES cipher")
 
 	// 创建CBC模式的解密器
 	mode := cipher.NewCBCDecrypter(block, iv)
-	log.Printf("5. 创建CBC模式解密器")
 
 	// 解密
 	plaintext := make([]byte, len(ciphertext))
 	mode.CryptBlocks(plaintext, ciphertext)
-	log.Printf("6. CBC模式解密后的数据: %x", plaintext)
 
 	// 去除PKCS7填充
 	padding := plaintext[len(plaintext)-1]
-	log.Printf("7. 检测PKCS7填充:")
-	log.Printf("   - 填充值: %x", padding)
-	log.Printf("   - 填充长度: %d", padding)
 
 	if padding > aes.BlockSize || padding == 0 {
 		return "", fmt.Errorf("无效的填充大小: %d", padding)
@@ -160,18 +149,12 @@ func decryptAESData(encryptedData string, key []byte) (string, error) {
 			return "", fmt.Errorf("无效的填充")
 		}
 	}
-	log.Printf("8. 填充验证通过")
 
 	// 移除填充
 	plaintext = plaintext[:len(plaintext)-int(padding)]
-	log.Printf("9. 移除填充后的数据: %x", plaintext)
 
 	// 转换为字符串
-	result := string(plaintext)
-	log.Printf("10. 最终解密结果: %s", result)
-	log.Printf("=== AES解密过程完成 ===\n")
-
-	return result, nil
+	return string(plaintext), nil
 }
 
 // authMiddleware JWT认证中间件

@@ -54,85 +54,103 @@ export default {
     })
 
     const getPublicKey = async () => {
-      try {
-        // 从localStorage获取公钥
-        const savedPublicKey = localStorage.getItem('publicKey')
-        if (savedPublicKey) {
-          publicKey.value = savedPublicKey
-          console.log('使用保存的公钥:', publicKey.value)
-          return
-        }
+      const maxRetries = 3;
+      let retryCount = 0;
+      
+      while (retryCount < maxRetries) {
+        try {
+          // 从localStorage获取公钥
+          const savedPublicKey = localStorage.getItem('publicKey')
+          if (savedPublicKey) {
+            publicKey.value = savedPublicKey
+            return
+          }
 
-        // 如果没有保存的公钥，则从服务器获取
-        const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/public-key`)
-        publicKey.value = response.data.public_key
-        localStorage.setItem('publicKey', publicKey.value)
-        console.log('获取到的公钥:', publicKey.value)
-      } catch (err) {
-        error.value = '获取公钥失败'
-        console.error('获取公钥失败:', err)
+          // 如果没有保存的公钥，则从服务器获取
+          const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/public-key`)
+          publicKey.value = response.data.public_key
+          localStorage.setItem('publicKey', publicKey.value)
+          return
+        } catch (err) {
+          retryCount++
+          if (retryCount === maxRetries) {
+            error.value = '获取公钥失败，请刷新页面重试'
+            console.error('获取公钥失败:', err)
+            return
+          }
+          await new Promise(resolve => setTimeout(resolve, 1000 * retryCount)) // 递增延迟
+        }
       }
     }
 
     const handleEncrypt = async () => {
       loading.value = true
       error.value = ''
+      const maxRetries = 3
+      let retryCount = 0
 
-      try {
-        // 获取token
-        const token = sessionStorage.getItem('token')
-        if (!token) {
-          throw new Error('未登录或登录已过期')
-        }
-
-        // 生成随机密钥
-        const aesKey = generateRandomKey()
-        console.log('生成的AES密钥:', aesKey)
-        
-        // 使用 AES 加密数据
-        const encryptedData = encryptWithAES(message.value, aesKey)
-        console.log('加密后的数据:', encryptedData)
-        
-        // 使用 RSA 加密 AES 密钥
-        const encryptedKey = encryptWithRSA(aesKey)
-        console.log('加密后的AES密钥:', encryptedKey)
-
-        const requestData = {
-          message: encryptedData
-        }
-        console.log('请求数据:', requestData)
-        console.log('请求头:', {
-          'Content-Type': 'application/json',
-          'X-Encrypted-Key': encryptedKey,
-          'Authorization': `Bearer ${token}`
-        })
-
-        const response = await axios.post(`${import.meta.env.VITE_API_BASE_URL}/encrypt`, requestData, {
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Encrypted-Key': encryptedKey,
-            'Authorization': `Bearer ${token}`
+      while (retryCount < maxRetries) {
+        try {
+          // 每次重试前都重新获取公钥
+          await getPublicKey()
+          
+          // 获取token
+          const token = sessionStorage.getItem('token')
+          if (!token) {
+            throw new Error('未登录或登录已过期')
           }
-        })
 
-        console.log('服务器响应:', response.data)
+          // 生成随机密钥
+          const aesKey = generateRandomKey()
+          
+          // 使用 AES 加密数据
+          const encryptedData = encryptWithAES(message.value, aesKey)
+          
+          // 使用 RSA 加密 AES 密钥
+          const encryptedKey = encryptWithRSA(aesKey)
 
-        if (response.status === 200) {
-          encryptedResult.value = {
-            decrypted_key: response.data.decrypted_key,
-            encrypted_data: response.data.encrypted_data,
-            decrypted_data: response.data.decrypted_data
+          const requestData = {
+            message: encryptedData
           }
-          console.log('设置的结果数据:', encryptedResult.value)
-        } else {
-          throw new Error(response.data.error || '加密失败')
+
+          const response = await axios.post(`${import.meta.env.VITE_API_BASE_URL}/encrypt`, requestData, {
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Encrypted-Key': encryptedKey,
+              'Authorization': `Bearer ${token}`
+            }
+          })
+
+          if (response.status === 200) {
+            encryptedResult.value = {
+              decrypted_key: response.data.decrypted_key,
+              encrypted_data: response.data.encrypted_data,
+              decrypted_data: response.data.decrypted_data
+            }
+            break // 成功则退出重试循环
+          } else {
+            throw new Error(response.data.error || '加密失败')
+          }
+        } catch (err) {
+          retryCount++
+          if (retryCount === maxRetries) {
+            error.value = err.message || '加密失败，请重试'
+            console.error('加密错误:', err)
+            break
+          }
+          
+          // 如果是400错误，可能是密钥问题，强制更新公钥
+          if (err.response && err.response.status === 400) {
+            // 清除本地存储的公钥
+            localStorage.removeItem('publicKey')
+            // 重新获取公钥
+            await getPublicKey()
+          }
+          
+          await new Promise(resolve => setTimeout(resolve, 1000 * retryCount)) // 递增延迟
         }
-      } catch (err) {
-        error.value = err.message || '加密失败，请重试'
-        console.error('加密错误:', err)
-      } finally {
-        loading.value = false
       }
+      loading.value = false
     }
 
     // 生成随机密钥
@@ -166,7 +184,6 @@ export default {
       
       // 转换为base64
       const base64Data = CryptoJS.enc.Base64.stringify(combined)
-      console.log('加密后的base64数据:', base64Data)
       return base64Data
     }
 
@@ -181,8 +198,6 @@ export default {
         }
         // 将base64字符串转换为更短的格式
         const shortKey = encrypted.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
-        console.log('RSA加密后的完整密钥:', encrypted)
-        console.log('转换后的短密钥:', shortKey)
         return shortKey
       } catch (error) {
         console.error('RSA加密过程出错:', error)
