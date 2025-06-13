@@ -1,6 +1,9 @@
 <template>
   <div class="login-container">
     <div v-if="!isLoggedIn" class="login-box">
+      <div class="logo-container">
+        <img src="/logo.svg" alt="Logo" class="logo" />
+      </div>
       <h2>登录</h2>
       <form @submit.prevent="handleLogin">
         <div class="form-group">
@@ -297,5 +300,16 @@ button:disabled {
   margin-top: 1.5rem; /* 调整顶部间距 */
   font-size: 1rem;
   font-weight: 500;
+}
+
+.logo-container {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.logo {
+  width: 120px;
+  height: auto;
+  object-fit: contain;
 }
 </style> 

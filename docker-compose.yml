@@ -3,8 +3,6 @@ version: '3'
 services:
   backend:
     build: ./backend
-    volumes:
-      - backend_keys:/app/keys
 
   frontend:
     build: ./frontend
@@ -14,7 +12,3 @@ services:
       - VITE_API_BASE_URL=/api
     depends_on:
       - backend
-
-volumes:
-  backend_logs:
-  backend_keys: 

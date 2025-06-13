@@ -1,4 +1,16 @@
-# 安全通信系统网关实例
+# 安全通信业务网关（名称解析：ModuGate）
+
+ModuGate 是一款基于 Go 开发的模块化安全通信网关。它采用插件化架构，支持灵活扩展，适用于企业级通信、物联网边缘接入、API 安全代理等多种场景。通过 ModuGate，用户可以快速构建高安全性、高性能的通信通道，并根据需求动态加载功能模块。
+
+名称解析：ModuGate
+🔤 拆解：
+Modu = 来自英文单词 "Modular"（模块化的）
+Gate = 英文单词 "Gateway"（网关） 的简写
+合起来就是：
+ModuGate = Modular + Gateway
+一个模块化的网关系统。
+
+![项目 Logo](frontend/public/logo.svg)
 
 ## 项目概述
 
