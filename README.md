@@ -38,17 +38,22 @@ ModuGate = Modular + Gateway
 │   ├── package.json        # 项目依赖配置
 │   ├── vite.config.js      # Vite 配置
 │   ├── nginx.conf          # Nginx 配置
-│   └── Dockerfile          # 前端 Docker 配置
+│   ├── Dockerfile          # 前端 Docker 配置
+│   ├── jsconfig.json       # JavaScript 配置
+│   └── index.html          # 入口 HTML 文件
 │
 ├── backend/                # 后端项目目录
 │   ├── crypto_service/     # 加密服务模块
+│   ├── config/            # 配置文件目录
 │   ├── keys/              # 密钥存储目录
 │   ├── main.go            # 主程序入口
 │   ├── go.mod             # Go 模块配置
+│   ├── go.sum             # Go 依赖版本锁定
 │   └── Dockerfile         # 后端 Docker 配置
 │
 ├── docker-compose.yml     # Docker 编排配置
 ├── API.md                 # API 文档
+├── LICENSE               # 许可证文件
 └── README.md             # 项目说明文档
 ```
 
@@ -102,12 +107,14 @@ ModuGate = Modular + Gateway
 - Vite
 - Axios
 - CryptoJS
+- Node.js 18+
 
 ### 后端
 - Go 1.21+
 - Gin Web框架
 - RSA-2048
 - AES-128-CBC
+- 模块化配置系统
 
 ## 安全特性
 
@@ -120,6 +127,10 @@ ModuGate = Modular + Gateway
    - 请求频率限制
    - CORS安全配置
    - 基于RSA和AES的认证机制
+   - 接口白名单机制
+     * 支持配置无需认证的公开接口
+     * 默认白名单：健康检查、公钥获取、登录接口
+     * 可通过配置文件动态管理白名单
 
 3. 密钥管理
    - 自动密钥轮换
