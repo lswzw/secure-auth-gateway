@@ -14,7 +14,7 @@ go.work
 # Go 依赖
 go.sum
 
-# Vue/Node 相关
+# Node/Vue/前端相关
 node_modules/
 dist/
 dist-ssr/
@@ -27,6 +27,7 @@ dist-ssr/
 *.log
 auth_service/*.log
 backend/*.log
+frontend/*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -45,6 +46,7 @@ pnpm-debug.log*
 *.pem
 *.key
 *.pub
+backend/keys/
 
 # 配置文件（除非是示例）
 *.config.json
@@ -58,6 +60,8 @@ pnpm-debug.log*
 # 构建输出
 /build/
 /out/
+frontend/public/assets/
+*.map
 
 # 测试覆盖率报告
 coverage/
@@ -65,4 +69,8 @@ coverage/
 
 # 系统文件
 .DS_Store
-Thumbs.db 
+Thumbs.db
+
+# Docker 相关
+.docker/
+docker-compose.override.yml 

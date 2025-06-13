@@ -1,79 +1,157 @@
-# 接口文档
+# API 文档
 
-## 认证服务 (auth_service)
+## 后端服务 API
 
-### 1. 获取公钥
-- **接口**: GET /public-key
-- **说明**: 返回PEM格式的RSA公钥，用于前端加密。
-- **响应示例**:
+### 证书管理
+
+#### 获取公钥
+- **URL**: `/api/public-key`
+- **方法**: `GET`
+- **描述**: 获取RSA公钥
+- **响应**:
   ```json
   {
-    "public_key": "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA..."
+    "code": 0,
+    "data": {
+      "public_key": "-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----",
+      "expires_at": "2024-03-16T00:00:00Z"
+    },
+    "message": "success",
+    "timestamp": "2024-03-15T12:00:00Z"
   }
   ```
 
-### 2. 解密数据
-- **接口**: POST /decrypt
-- **说明**: 使用私钥解密前端加密的数据。
+#### 加密数据
+- **URL**: `/api/encrypt`
+- **方法**: `POST`
+- **描述**: 使用RSA公钥加密数据
+- **请求头**:
+  - `Authorization`: Bearer {token}
+  - `X-Encrypted-Key`: 加密后的AES密钥
 - **请求体**:
   ```json
   {
-    "encrypted_data": "base64加密字符串"
+    "message": "要加密的数据"
   }
   ```
-- **响应示例**:
+- **响应**:
   ```json
   {
-    "decrypted_data": "明文数据"
+    "code": 0,
+    "data": {
+      "decrypted_key": "解密后的AES密钥",
+      "encrypted_data": "加密后的数据",
+      "decrypted_data": "解密后的数据"
+    },
+    "message": "success",
+    "timestamp": "2024-03-15T12:00:00Z"
   }
   ```
 
----
+### 用户认证
 
-## 后端服务 (backend)
-
-### 1. 登录
-- **接口**: POST /login
-- **说明**: 接收加密的用户名和密码，解密后校验登录。
+#### 登录
+- **URL**: `/api/login`
+- **方法**: `POST`
+- **描述**: 用户登录
+- **请求头**:
+  - `X-Encrypted-Key`: 加密后的AES密钥
 - **请求体**:
   ```json
   {
-    "encrypted_username": "base64加密字符串",
-    "encrypted_password": "base64加密字符串"
+    "username": "加密后的用户名",
+    "password": "加密后的密码"
   }
   ```
-- **响应示例**:
+- **响应**:
   ```json
   {
-    "status": "success",
-    "message": "登录成功"
+    "code": 0,
+    "data": {
+      "status": "success",
+      "message": "登录成功"
+    },
+    "message": "success",
+    "timestamp": "2024-03-15T12:00:00Z"
   }
   ```
 
----
-
-## 健康检查接口
-
-### 1. 认证服务健康检查
-- **接口**: GET /health
-- **说明**: 返回服务健康状态。
-- **响应示例**:
+### 健康检查
+- **URL**: `/api/health`
+- **方法**: `GET`
+- **描述**: 检查服务健康状态
+- **响应**:
   ```json
   {
-    "status": "healthy"
+    "code": 0,
+    "data": {
+      "status": "healthy"
+    },
+    "message": "success",
+    "timestamp": "2024-03-15T12:00:00Z"
   }
   ```
 
-### 2. 后端服务健康检查
-- **接口**: GET /health
-- **说明**: 返回服务健康状态。
-- **响应示例**:
-  ```json
-  {
-    "status": "healthy"
-  }
-  ```
+## 错误处理
 
----
+所有API在发生错误时都会返回以下格式的响应：
 
-如需更多接口说明或有其他需求，请随时联系！ 
+```json
+{
+  "code": 错误码,
+  "data": null,
+  "message": "错误描述",
+  "timestamp": "2024-03-15T12:00:00Z"
+}
+```
+
+### 错误码说明
+
+- 1000: 系统错误
+- 1001: 参数错误
+- 1002: 认证失败
+- 1003: 授权失败
+- 1004: 资源不存在
+- 1005: 请求频率超限
+- 1006: 服务不可用
+- 1007: 加密失败
+- 1008: 解密失败
+
+## 安全说明
+
+1. 所有API请求都需要使用HTTPS
+2. 需要JWT认证的接口必须在请求头中携带有效的令牌
+3. 敏感数据使用RSA-2048加密
+4. 实现了请求频率限制
+5. 支持CORS安全配置
+
+## 请求限制
+
+- 登录：5次/分钟
+- 加密操作：20次/分钟
+- 健康检查：30次/分钟
+
+## 响应格式
+
+所有API响应都遵循以下格式：
+
+```json
+{
+  "code": 0,           // 状态码，0表示成功
+  "data": {},         // 响应数据
+  "message": "",      // 响应消息
+  "timestamp": ""     // 响应时间戳
+}
+```
+
+## 版本控制
+
+API版本通过URL路径控制，当前版本为v1。未来版本将使用新的路径，如`/api/v2/`。
+
+## 更新日志
+
+### v1.0.0 (2024-03-15)
+- 初始版本发布
+- 实现基本的加密解密功能
+- 添加用户认证
+- 实现健康检查 

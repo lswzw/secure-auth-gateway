@@ -1,43 +1,20 @@
 version: '3'
 
 services:
-  auth_service:
-    build: ./auth_service
-    ports:
-      - "8001:8001"
-    environment:
-      - PORT=8001
-      - SERVICE_TOKEN=your-secure-token
-    volumes:
-      - ./auth_service:/app
-      - auth_service_logs:/app/logs
-
   backend:
     build: ./backend
-    ports:
-      - "8000:8000"
-    environment:
-      - PORT=8000
-      - AUTH_SERVICE_URL=http://auth_service:8001
-      - SERVICE_TOKEN=your-secure-token
     volumes:
-      - ./backend:/app
-      - backend_logs:/app/logs
-    depends_on:
-      - auth_service
+      - backend_keys:/app/keys
 
   frontend:
-    build: ./frontend/vue-project
+    build: ./frontend
     ports:
-      - "5173:5173"
+      - "80:80"
     environment:
-      - VITE_API_URL=http://localhost:8000
-    volumes:
-      - ./frontend/vue-project:/app
-      - /app/node_modules
+      - VITE_API_BASE_URL=/api
     depends_on:
       - backend
 
 volumes:
-  auth_service_logs:
-  backend_logs: 
+  backend_logs:
+  backend_keys: 
