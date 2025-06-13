@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"backend/config"
 	"backend/crypto_service"
 
 	"github.com/gin-gonic/gin"
@@ -46,7 +47,7 @@ type Config struct {
 	KeyPath string
 }
 
-var config = Config{
+var appConfig = Config{
 	Port:    getEnv("PORT", "8000"),
 	KeyPath: getEnv("KEY_PATH", "./keys"),
 }
@@ -80,7 +81,7 @@ func getEnv(key, defaultValue string) string {
 func init() {
 	var err error
 	// 初始化RSA服务
-	rsaService, err = crypto_service.NewRSAService(config.KeyPath)
+	rsaService, err = crypto_service.NewRSAService(appConfig.KeyPath)
 	if err != nil {
 		log.Fatalf("初始化RSA服务失败: %v", err)
 	}
@@ -176,6 +177,12 @@ func decryptAESData(encryptedData string, key []byte) (string, error) {
 // authMiddleware JWT认证中间件
 func authMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// 检查是否在白名单中
+		if config.IsWhitelisted(c.Request.URL.Path) {
+			c.Next()
+			return
+		}
+
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "未提供认证token"})
@@ -383,8 +390,8 @@ func main() {
 	}
 
 	// 启动服务器
-	log.Printf("服务器启动在端口 %s", config.Port)
-	if err := r.Run(":" + config.Port); err != nil {
+	log.Printf("服务器启动在端口 %s", appConfig.Port)
+	if err := r.Run(":" + appConfig.Port); err != nil {
 		log.Fatalf("启动服务器失败: %v", err)
 	}
 }
